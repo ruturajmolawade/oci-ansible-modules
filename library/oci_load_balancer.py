@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2018, 2020 Oracle and/or its affiliates.
+# Copyright (c) 2018, 2019 Oracle and/or its affiliates.
 # This software is made available to you under the terms of the GPL 3.0 license or the Apache 2.0 license.
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 # Apache License v2.0
@@ -201,10 +201,9 @@ options:
     subnet_ids:
         description: An array of subnet OCIDs.
         required: true
-
 author:
     - "Debayan Gupta(@debayan_gupta)"
-extends_documentation_fragment: [ oracle, oracle_creatable_resource, oracle_wait_options, oracle_tags ]
+extends_documentation_fragment: [ oracle, oracle_creatable_resource, oracle_wait_options ]
 """
 
 EXAMPLES = """
@@ -456,9 +455,7 @@ RETURN = """
       "ocid1.subnet.oc1.iad.xxxxxEXAMPLExxxxx",
       "ocid1.subnet.oc1.iad.xxxxxEXAMPLExxxxx"
    ],
-   "time_created":"2018-01-06T18:22:17.198000+00:00",
-   "defined_tags": {"Operations": {"CostCenter": "42"}},
-   "freeform_tags": {"Department": "Finance"},
+   "time_created":"2018-01-06T18:22:17.198000+00:00"
 }
 """
 
@@ -570,8 +567,6 @@ def create_load_balancer(lb_client, module):
     subnet_ids = module.params["subnet_ids"]
     shape_name = module.params["shape_name"]
     is_private = module.params.get("is_private", False)
-    defined_tags = module.params["defined_tags"]
-    freeform_tags = module.params["freeform_tags"]
     create_load_balancer_details = CreateLoadBalancerDetails()
     atributes_to_value_dict = dict(
         {
@@ -585,8 +580,6 @@ def create_load_balancer(lb_client, module):
             "hostnames": hostnames,
             "shape_name": shape_name,
             "subnet_ids": subnet_ids,
-            "freeform_tags": freeform_tags,
-            "defined_tags": defined_tags,
         }
     )
     for key, value in six.iteritems(atributes_to_value_dict):
@@ -613,36 +606,14 @@ def update_load_balancer(lb_client, module, load_balancer):
         )
     result = dict(load_balancer=to_dict(load_balancer), changed=False)
     name = module.params["display_name"]
-    defined_tags = module.params["defined_tags"]
-    freeform_tags = module.params["freeform_tags"]
     update_load_balancer_details = UpdateLoadBalancerDetails()
-    changed = False
-    if name is not None and load_balancer.display_name.strip() != name.strip():
+    if load_balancer.display_name.strip() != name.strip():
         get_logger().info(
             "Updating the display name of load balancer from %s to %s",
             load_balancer.display_name,
             name,
         )
-        changed = True
-    if freeform_tags is not None and load_balancer.freeform_tags != freeform_tags:
-        get_logger().info(
-            "Updating the freeform_tags of load balancer from {0} to {1}".format(
-                load_balancer.freeform_tags, freeform_tags
-            )
-        )
-        changed = True
-    if defined_tags is not None and load_balancer.defined_tags != defined_tags:
-        get_logger().info(
-            "Updating the defined_tags of load balancer from {0} to {1}".format(
-                load_balancer.defined_tags, defined_tags
-            )
-        )
-        changed = True
-
-    if changed is True:
         update_load_balancer_details.display_name = name
-        update_load_balancer_details.freeform_tags = freeform_tags
-        update_load_balancer_details.defined_tags = defined_tags
         result = oci_lb_utils.create_or_update_lb_resources_and_wait(
             resource_type="load_balancer",
             function=lb_client.update_load_balancer,
@@ -655,10 +626,15 @@ def update_load_balancer(lb_client, module, load_balancer):
             kwargs_get={"load_balancer_id": load_balancer.id},
             module=module,
         )
-        get_logger().info("Successfully updated the parameters of load balancer")
+
+        get_logger().info(
+            "Successfully updated the display name of load balancer from %s to %s",
+            load_balancer.display_name,
+            name,
+        )
     if not result["changed"]:
         get_logger().info(
-            "Unable to update load balancer as the new parameter is same as old one"
+            "Unable to update display name of load balancer as the new name is same as old"
         )
     return result
 
@@ -695,7 +671,7 @@ def get_logger():
 def main():
     logger = oci_utils.get_logger("oci_load_balancer")
     set_logger(logger)
-    module_args = oci_utils.get_taggable_arg_spec(
+    module_args = oci_utils.get_common_arg_spec(
         supports_create=True, supports_wait=True
     )
     module_args.update(
